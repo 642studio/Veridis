@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { getState, addEvent } from "./state.js";
+import { assistantQuery, type AssistantQueryRequest } from "./services/assistant.js";
 
 export async function registerRoutes(app: FastifyInstance) {
   // GET /health — liveness check
@@ -7,9 +8,14 @@ export async function registerRoutes(app: FastifyInstance) {
     return { ok: true, service: "veridis-core" };
   });
 
-  // GET /state — devuelve el estado actual
+  // GET /state — devuelve el estado actual (raw)
   app.get("/state", async () => {
     return getState();
+  });
+
+  // POST /assistant/query — structured summary for operators/assistants (read-only)
+  app.post<{ Body: AssistantQueryRequest }>("/assistant/query", async (request) => {
+    return assistantQuery(getState(), request.body);
   });
 
   // POST /events — recibe evento JSON, lo guarda y actualiza estado
