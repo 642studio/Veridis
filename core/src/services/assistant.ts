@@ -7,11 +7,12 @@ export type AssistantQueryRequest = {
 
 export type AssistantQueryResponse = {
   ok: true;
-  status: SystemState["status"]; // core status
+  status: SystemState["status"]; // derived status
   summary: string;
   suggestedActions: string[];
   updatedAt: string;
   lastEvent: SystemState["lastEvent"];
+  recentEvents?: SystemState["recentEvents"];
 };
 
 function statusFromLevel(level?: VeridisEventLevel): SystemState["status"] {
@@ -39,9 +40,9 @@ function buildSuggestedActions(state: SystemState): string[] {
   return ["Check system status", "Emit a test event", "Review recent changes"];
 }
 
-export function assistantQuery(state: SystemState, _req?: AssistantQueryRequest): AssistantQueryResponse {
+export function assistantQuery(state: SystemState, req?: AssistantQueryRequest): AssistantQueryResponse {
   const derivedStatus = statusFromLevel(state.lastEvent?.level);
-  return {
+  const base: AssistantQueryResponse = {
     ok: true,
     status: derivedStatus,
     summary: buildSummary({ ...state, status: derivedStatus }),
@@ -49,4 +50,11 @@ export function assistantQuery(state: SystemState, _req?: AssistantQueryRequest)
     updatedAt: state.updatedAt,
     lastEvent: state.lastEvent,
   };
+
+  if (req?.verbose) {
+    // newest-first (keep it small)
+    base.recentEvents = state.recentEvents.slice(-10).reverse();
+  }
+
+  return base;
 }

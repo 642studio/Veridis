@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { getState, addEvent } from "./state.js";
+import { getState, addEvent, getEvents, getAlerts } from "./state.js";
 import { assistantQuery, type AssistantQueryRequest } from "./services/assistant.js";
 
 export async function registerRoutes(app: FastifyInstance) {
@@ -11,6 +11,20 @@ export async function registerRoutes(app: FastifyInstance) {
   // GET /state — devuelve el estado actual (raw)
   app.get("/state", async () => {
     return getState();
+  });
+
+  // GET /events?limit=50 — recent events (newest first)
+  app.get("/events", async (request) => {
+    const q = request.query as { limit?: string };
+    const limit = q?.limit ? parseInt(q.limit, 10) : 50;
+    return { ok: true, events: getEvents(Number.isFinite(limit) ? limit : 50) };
+  });
+
+  // GET /alerts?limit=50 — critical events only (newest first)
+  app.get("/alerts", async (request) => {
+    const q = request.query as { limit?: string };
+    const limit = q?.limit ? parseInt(q.limit, 10) : 50;
+    return { ok: true, alerts: getAlerts(Number.isFinite(limit) ? limit : 50) };
   });
 
   // POST /assistant/query — structured summary for operators/assistants (read-only)

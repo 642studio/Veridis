@@ -4,8 +4,11 @@ import type { SystemState, VeridisEvent, VeridisEventLevel } from "./types.js";
 const initialState: SystemState = {
   status: "idle",
   lastEvent: null,
+  recentEvents: [],
   updatedAt: new Date().toISOString(),
 };
+
+const MAX_EVENTS = 200;
 
 let state: SystemState = { ...initialState };
 
@@ -63,17 +66,39 @@ function normalizeEvent(input: unknown): VeridisEvent {
  * Devuelve una copia del estado actual.
  */
 export function getState(): SystemState {
-  return { ...state };
+  return { ...state, recentEvents: [...state.recentEvents] };
+}
+
+export function getEvents(limit = 50): VeridisEvent[] {
+  const capped = Math.max(1, Math.min(limit, MAX_EVENTS));
+  // Return newest-first
+  return state.recentEvents.slice(-capped).reverse();
+}
+
+export function getAlerts(limit = 50): VeridisEvent[] {
+  // v0: treat critical as alert
+  return getEvents(limit).filter((e) => e.level === "critical");
+}
+
+function statusFromLevel(level?: VeridisEventLevel): SystemState["status"] {
+  if (level === "critical") return "alert";
+  if (level === "warning") return "processing";
+  return "idle";
 }
 
 /**
- * Registra un evento: lo guarda como lastEvent, pone status en "alert" y actualiza updatedAt.
+ * Registra un evento: lo guarda como lastEvent, agrega a recentEvents y actualiza estado.
  */
 export function addEvent(event: unknown): void {
   const normalized = normalizeEvent(event);
+
+  const nextEvents = [...state.recentEvents, normalized];
+  const trimmed = nextEvents.length > MAX_EVENTS ? nextEvents.slice(-MAX_EVENTS) : nextEvents;
+
   state = {
-    status: "alert",
+    status: statusFromLevel(normalized.level),
     lastEvent: normalized,
+    recentEvents: trimmed,
     updatedAt: normalized.timestamp,
   };
 }
