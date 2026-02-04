@@ -1,8 +1,12 @@
 import type { FastifyInstance } from "fastify";
 import { getState, addEvent, getEvents, getAlerts } from "./state.js";
 import { assistantQuery, type AssistantQueryRequest } from "./services/assistant.js";
+import { AuthzService } from "./services/authz.js";
 
 export async function registerRoutes(app: FastifyInstance) {
+  const authz = new AuthzService(new URL("../data/authz.json", import.meta.url).pathname);
+  await authz.load();
+
   // GET /health — liveness check
   app.get("/health", async () => {
     return { ok: true, service: "veridis-core" };
@@ -31,6 +35,47 @@ export async function registerRoutes(app: FastifyInstance) {
   app.post<{ Body: AssistantQueryRequest }>("/assistant/query", async (request) => {
     return assistantQuery(getState(), request.body);
   });
+
+  // --- AuthZ (v0) ---
+  app.post<{ Body: { telegramUserId: string; name?: string; origin?: string } }>(
+    "/auth/onboard",
+    async (request) => {
+      const user = await authz.onboard(request.body);
+      return { ok: true, user };
+    }
+  );
+
+  app.post<{ Body: { telegramUserId: string; code: string } }>(
+    "/auth/redeem",
+    async (request, reply) => {
+      try {
+        const user = await authz.redeemInviteCode(request.body);
+        return { ok: true, user };
+      } catch (err) {
+        return reply.status(400).send({ ok: false, error: String((err as Error).message ?? err) });
+      }
+    }
+  );
+
+  app.post<{ Body: { telegramUserId: string; action: string } }>("/auth/check", async (request) => {
+    const result = authz.checkAction(request.body);
+    return { ok: true, ...result };
+  });
+
+  app.post<{ Body: { telegramUserId: string; ttlHours?: number } }>(
+    "/auth/invite/create",
+    async (request, reply) => {
+      try {
+        const invite = await authz.createInviteCode({
+          createdByTelegramUserId: request.body.telegramUserId,
+          ttlHours: request.body.ttlHours ?? 12,
+        });
+        return { ok: true, invite };
+      } catch (err) {
+        return reply.status(403).send({ ok: false, error: String((err as Error).message ?? err) });
+      }
+    }
+  );
 
   // POST /events — recibe evento JSON, lo guarda y actualiza estado
   app.post<{ Body: unknown }>("/events", async (request, reply) => {
