@@ -86,34 +86,71 @@ export class MicrophoneCapture extends EventEmitter<MicrophoneCaptureEvents> {
 export interface SpeakerPlaybackOptions {
   sampleRate: number;
   channels: number;
+  backend?: "ffplay" | "aplay";
+  device?: string;
 }
 
 export class SpeakerPlayback {
   private process: ChildProcess | null = null;
+  private readonly backend: "ffplay" | "aplay";
+  private readonly device: string;
 
-  constructor(private readonly options: SpeakerPlaybackOptions) {}
+  constructor(private readonly options: SpeakerPlaybackOptions) {
+    this.backend = options.backend ?? "ffplay";
+    this.device = options.device ?? "default";
+  }
 
   public beginStream(): void {
     if (this.process) {
       return;
     }
 
-    const args = [
-      "-nodisp",
-      "-autoexit",
-      "-loglevel",
-      "error",
-      "-f",
-      "s16le",
-      "-ar",
-      String(this.options.sampleRate),
-      "-ac",
-      String(this.options.channels),
-      "-",
-    ];
+    if (this.backend === "aplay") {
+      const args = [
+        "-q",
+        "-f",
+        "S16_LE",
+        "-r",
+        String(this.options.sampleRate),
+        "-c",
+        String(this.options.channels),
+        "-D",
+        this.device,
+        "-",
+      ];
+      this.process = spawn("aplay", args, {
+        stdio: ["pipe", "ignore", "pipe"],
+      });
+    } else {
+      const args = [
+        "-nodisp",
+        "-autoexit",
+        "-loglevel",
+        "error",
+        "-f",
+        "s16le",
+        "-ar",
+        String(this.options.sampleRate),
+        "-ac",
+        String(this.options.channels),
+        "-",
+      ];
+      const env = { ...process.env };
+      if (this.device && this.device !== "default") {
+        env.AUDIODEV = this.device;
+      }
+      this.process = spawn("ffplay", args, {
+        stdio: ["pipe", "ignore", "pipe"],
+        env,
+      });
+    }
 
-    this.process = spawn("ffplay", args, {
-      stdio: ["pipe", "ignore", "pipe"],
+    this.process.stderr?.on("data", () => {
+      // ignore stderr by default; logs can get noisy on ALSA setups
+    });
+
+    this.process.on("error", () => {
+      this.process = null;
     });
 
     this.process.on("exit", () => {

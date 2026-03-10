@@ -14,6 +14,7 @@ export interface RealtimeClientOptions {
   model: string;
   voice: string;
   transcribeModel: string;
+  transcribeLanguage?: string;
   reconnectBaseMs?: number;
   logger: Logger;
 }
@@ -198,6 +199,7 @@ export class RealtimeClient extends EventEmitter<RealtimeEvents> {
   }
 
   private configureSession(): void {
+    const language = this.options.transcribeLanguage?.trim();
     this.send({
       type: "session.update",
       session: {
@@ -207,6 +209,7 @@ export class RealtimeClient extends EventEmitter<RealtimeEvents> {
         output_audio_format: "pcm16",
         input_audio_transcription: {
           model: this.options.transcribeModel,
+          ...(language ? { language } : {}),
         },
         turn_detection: {
           type: "server_vad",

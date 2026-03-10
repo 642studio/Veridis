@@ -52,6 +52,8 @@ export interface BridgeStatus {
   devices: {
     cameraDevice: string;
     micDevice: string;
+    speakerDevice: string;
+    speakerBackend: "ffplay" | "aplay";
     speakerSampleRate: number;
   };
 }

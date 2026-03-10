@@ -30,6 +30,8 @@ export interface BridgeOrchestratorOptions {
   wakePhrase: string;
   micDevice: string;
   cameraDevice: string;
+  speakerDevice?: string;
+  speakerBackend?: "ffplay" | "aplay";
   speakerSampleRate: number;
   logger: Logger;
 }
@@ -110,6 +112,8 @@ export class BridgeOrchestrator extends EventEmitter<OrchestratorEvents> {
       wakePhrase: this.options.wakePhrase,
       cameraDevice: this.options.cameraDevice,
       micDevice: this.options.micDevice,
+      speakerDevice: this.options.speakerDevice ?? "default",
+      speakerBackend: this.options.speakerBackend ?? "ffplay",
       speakerSampleRate: this.options.speakerSampleRate,
     });
   }
@@ -176,6 +180,8 @@ export class BridgeOrchestrator extends EventEmitter<OrchestratorEvents> {
       devices: {
         cameraDevice: this.options.cameraDevice,
         micDevice: this.options.micDevice,
+        speakerDevice: this.options.speakerDevice ?? "default",
+        speakerBackend: this.options.speakerBackend ?? "ffplay",
         speakerSampleRate: this.options.speakerSampleRate,
       },
     };

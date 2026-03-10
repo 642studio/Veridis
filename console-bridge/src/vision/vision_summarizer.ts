@@ -11,6 +11,52 @@ export interface VisionSummarizerOptions {
 
 interface ResponsesApiResult {
   output_text?: string;
+  output?: unknown;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
+}
+
+function extractTextFromOutput(output: unknown): string | null {
+  if (!Array.isArray(output)) {
+    return null;
+  }
+
+  for (const item of output) {
+    const itemRecord = asRecord(item);
+    if (!itemRecord) {
+      continue;
+    }
+    const content = itemRecord.content;
+    if (!Array.isArray(content)) {
+      continue;
+    }
+    for (const contentItem of content) {
+      const contentRecord = asRecord(contentItem);
+      if (!contentRecord) {
+        continue;
+      }
+      if (typeof contentRecord.text === "string" && contentRecord.text.trim()) {
+        return contentRecord.text.trim();
+      }
+      if (typeof contentRecord.output_text === "string" && contentRecord.output_text.trim()) {
+        return contentRecord.output_text.trim();
+      }
+    }
+  }
+
+  return null;
+}
+
+export function extractVisionSummaryText(result: ResponsesApiResult): string | null {
+  if (typeof result.output_text === "string" && result.output_text.trim()) {
+    return result.output_text.trim();
+  }
+  return extractTextFromOutput(result.output);
 }
 
 export class VisionSummarizer {
@@ -88,10 +134,11 @@ export class VisionSummarizer {
       }
 
       const result = (await response.json()) as ResponsesApiResult;
-      const summary =
-        typeof result.output_text === "string" && result.output_text.trim()
-          ? result.output_text.trim()
-          : this.buildFallbackSummary(snapshots);
+      const extractedSummary = extractVisionSummaryText(result);
+      const summary = extractedSummary ?? this.buildFallbackSummary(snapshots);
+      if (!extractedSummary) {
+        this.options.logger.warn("Vision API response did not include text summary; using fallback");
+      }
 
       return {
         summary,

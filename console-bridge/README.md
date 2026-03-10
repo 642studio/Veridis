@@ -48,10 +48,13 @@ Variables principales:
 - `OPENAI_API_KEY`
 - `OPENAI_REALTIME_MODEL`
 - `OPENAI_REALTIME_VOICE`
+- `OPENAI_REALTIME_TRANSCRIBE_LANGUAGE` (`es` recomendado)
 - `WAKE_PHRASE`
 - `KEEP_SNAPSHOTS` (`false` recomendado para 24/7)
 - `CAMERA_DEVICE`
 - `MIC_DEVICE`
+- `SPEAKER_BACKEND` (`aplay` recomendado en Linux)
+- `SPEAKER_DEVICE` (ej. `plughw:CARD=Generic_1,DEV=0`)
 - `OPENCLAW_SESSION_KEY`
 - `VERIDIS_CORE_URL`
 
@@ -85,7 +88,7 @@ npm start
 Valida:
 
 - binarios (`ffmpeg`, `ffplay`, `openclaw`)
-- salida de audio de speaker (probe corto)
+- salida de audio de speaker segun backend (`aplay`/`ffplay`)
 - dispositivo de camara (v4l2)
 - salud de VERIDIS Core
 - estado de OpenClaw Gateway
@@ -102,6 +105,8 @@ npm run doctor
 ```bash
 npm run devices
 ```
+
+Tip Linux: si no se escucha audio, usa `aplay -l` y configura `SPEAKER_DEVICE` a una salida concreta (por ejemplo `plughw:CARD=Generic_1,DEV=0` para analogo).
 
 2. Ejecuta preflight:
 

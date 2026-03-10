@@ -96,6 +96,8 @@ async function main(): Promise<void> {
   const config = loadConfig({ allowMissingSecrets: true });
   const checks: CheckResult[] = [];
   const platform = process.platform;
+  const ffplayInstalled = await commandExists("ffplay");
+  const aplayInstalled = await commandExists("aplay");
 
   checks.push({
     name: "ffmpeg",
@@ -105,8 +107,24 @@ async function main(): Promise<void> {
 
   checks.push({
     name: "ffplay",
-    ok: await commandExists("ffplay"),
-    detail: "Required for speaker playback",
+    ok: config.SPEAKER_BACKEND === "ffplay" ? ffplayInstalled : true,
+    detail:
+      config.SPEAKER_BACKEND === "ffplay"
+        ? "Required for speaker playback (ffplay backend)"
+        : ffplayInstalled
+          ? "Optional dependency available"
+          : "Optional dependency not installed (not required for selected backend)",
+  });
+
+  checks.push({
+    name: "aplay",
+    ok: config.SPEAKER_BACKEND === "aplay" ? aplayInstalled : true,
+    detail:
+      config.SPEAKER_BACKEND === "aplay"
+        ? "Required for speaker playback (aplay backend)"
+        : aplayInstalled
+          ? "Optional dependency available"
+          : "Optional dependency not installed (not required for selected backend)",
   });
 
   checks.push({
@@ -116,9 +134,59 @@ async function main(): Promise<void> {
   });
 
   const hasFfmpeg = checks.find((check) => check.name === "ffmpeg")?.ok ?? false;
-  const hasFfplay = checks.find((check) => check.name === "ffplay")?.ok ?? false;
+  const hasFfplay = ffplayInstalled;
+  const hasAplay = aplayInstalled;
 
-  if (hasFfplay && platform === "linux") {
+  if (config.SPEAKER_BACKEND === "ffplay" && !hasFfplay) {
+    checks.push({
+      name: "speaker-backend",
+      ok: false,
+      detail: "SPEAKER_BACKEND=ffplay but ffplay is not installed",
+    });
+  } else if (config.SPEAKER_BACKEND === "aplay" && !hasAplay) {
+    checks.push({
+      name: "speaker-backend",
+      ok: false,
+      detail: "SPEAKER_BACKEND=aplay but aplay is not installed",
+    });
+  } else {
+    checks.push({
+      name: "speaker-backend",
+      ok: true,
+      detail: `Using ${config.SPEAKER_BACKEND} (device: ${config.SPEAKER_DEVICE})`,
+    });
+  }
+
+  if (platform !== "linux") {
+    checks.push({
+      name: "speaker-probe",
+      ok: true,
+      detail: `Skipped on platform ${platform}; run on Linux target host`,
+    });
+  } else if (config.SPEAKER_BACKEND === "aplay" && hasAplay) {
+    const speakerProbe = await runCommand("aplay", [
+      "-q",
+      "-d",
+      "1",
+      "-f",
+      "S16_LE",
+      "-r",
+      String(config.SPEAKER_SAMPLE_RATE),
+      "-c",
+      "1",
+      "-D",
+      config.SPEAKER_DEVICE,
+      "/dev/zero",
+    ]);
+    checks.push({
+      name: "speaker-probe",
+      ok: speakerProbe.code === 0,
+      detail:
+        speakerProbe.code === 0
+          ? `Speaker opened via aplay (${config.SPEAKER_DEVICE}, ${config.SPEAKER_SAMPLE_RATE}Hz)`
+          : speakerProbe.stderr.trim() || "Failed speaker probe via aplay",
+    });
+  } else if (config.SPEAKER_BACKEND === "ffplay" && hasFfplay) {
     const speakerProbe = await runCommand("ffplay", [
       "-nodisp",
       "-autoexit",
@@ -136,14 +204,8 @@ async function main(): Promise<void> {
       ok: speakerProbe.code === 0,
       detail:
         speakerProbe.code === 0
-          ? `Speaker playback opened at ${config.SPEAKER_SAMPLE_RATE}Hz`
-          : speakerProbe.stderr.trim() || "Failed to open speaker playback",
-    });
-  } else if (hasFfplay) {
-    checks.push({
-      name: "speaker-probe",
-      ok: true,
-      detail: `Skipped on platform ${platform}; run on Linux target host`,
+          ? `Speaker opened via ffplay (${config.SPEAKER_SAMPLE_RATE}Hz)`
+          : speakerProbe.stderr.trim() || "Failed speaker probe via ffplay",
     });
   }
 

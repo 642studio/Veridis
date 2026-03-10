@@ -24,6 +24,8 @@ async function main(): Promise<void> {
   const speaker = new SpeakerPlayback({
     sampleRate: config.SPEAKER_SAMPLE_RATE,
     channels: 1,
+    backend: config.SPEAKER_BACKEND,
+    device: config.SPEAKER_DEVICE,
   });
 
   const realtimeClient = new RealtimeClient({
@@ -32,6 +34,7 @@ async function main(): Promise<void> {
     model: config.OPENAI_REALTIME_MODEL,
     voice: config.OPENAI_REALTIME_VOICE,
     transcribeModel: config.OPENAI_REALTIME_TRANSCRIBE_MODEL,
+    transcribeLanguage: config.OPENAI_REALTIME_TRANSCRIBE_LANGUAGE,
     logger,
   });
 
@@ -78,6 +81,8 @@ async function main(): Promise<void> {
       wakePhrase: config.WAKE_PHRASE,
       micDevice: config.MIC_DEVICE,
       cameraDevice: config.CAMERA_DEVICE,
+      speakerDevice: config.SPEAKER_DEVICE,
+      speakerBackend: config.SPEAKER_BACKEND,
       speakerSampleRate: config.SPEAKER_SAMPLE_RATE,
       logger,
     },

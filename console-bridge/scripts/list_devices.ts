@@ -96,6 +96,14 @@ async function main(): Promise<void> {
     console.log("arecord no esta instalado.");
   }
 
+  printSection("Salidas ALSA");
+  if (await commandExists("aplay")) {
+    const result = await runCommand("aplay", ["-l"]);
+    console.log(result.output || "Sin salida de aplay -l");
+  } else {
+    console.log("aplay no esta instalado.");
+  }
+
   printSection("PulseAudio/PipeWire Sources");
   if (await commandExists("pactl")) {
     const result = await runCommand("pactl", ["list", "short", "sources"]);
@@ -113,7 +121,7 @@ async function main(): Promise<void> {
   }
 
   printSection("Siguiente paso recomendado");
-  console.log("1) Ajusta CAMERA_DEVICE, MIC_DEVICE y MIC_INPUT_FORMAT en .env.");
+  console.log("1) Ajusta CAMERA_DEVICE, MIC_DEVICE, SPEAKER_DEVICE y formatos en .env.");
   console.log("2) Corre: npm run doctor");
   console.log("3) Arranca bridge: npm run dev");
   console.log("4) Prueba turno manual: npm run smoke:manual -- \"estado del sistema\"");
