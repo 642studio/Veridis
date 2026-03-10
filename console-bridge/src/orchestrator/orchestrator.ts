@@ -166,6 +166,35 @@ export class BridgeOrchestrator extends EventEmitter<OrchestratorEvents> {
     return turnId;
   }
 
+  public async runSpeakerProbe(text: string): Promise<void> {
+    const normalizedText = text.trim();
+    if (!normalizedText) {
+      throw new Error("Speaker probe text cannot be empty");
+    }
+
+    if (this.state === "thinking" || this.state === "speaking") {
+      throw new Error("Bridge is busy processing another turn");
+    }
+
+    this.pushActivity("system", "Running speaker probe", {
+      text: normalizedText.slice(0, 220),
+    });
+
+    try {
+      this.setState("speaking");
+      this.deps.speaker.beginStream();
+      await this.deps.realtimeClient.speakText(normalizedText);
+      await this.enterCooldown();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.pushActivity("turn.failed", "Speaker probe failed", {
+        error: errorMessage.slice(0, 220),
+      });
+      await this.enterCooldown();
+      throw error;
+    }
+  }
+
   public getStatus(): BridgeStatus {
     return {
       state: this.state,

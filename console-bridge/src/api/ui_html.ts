@@ -292,7 +292,10 @@ export function renderDashboardHtml(): string {
             <button id="refreshBtn" type="button">Refresh now</button>
           </div>
           <input id="utteranceInput" type="text" value="dame el estado del sistema" />
-          <button id="turnBtn" type="button">Run Test Turn</button>
+          <div class="btn-row">
+            <button id="turnBtn" type="button">Run Test Turn</button>
+            <button id="speakBtn" type="button">Test Speaker</button>
+          </div>
           <div id="controlMessage" class="sub"></div>
           <div id="controlError" class="err"></div>
         </div>
@@ -353,6 +356,7 @@ export function renderDashboardHtml(): string {
       unmuteBtn: document.getElementById('unmuteBtn'),
       refreshBtn: document.getElementById('refreshBtn'),
       turnBtn: document.getElementById('turnBtn'),
+      speakBtn: document.getElementById('speakBtn'),
       utteranceInput: document.getElementById('utteranceInput'),
       controlMessage: document.getElementById('controlMessage'),
       controlError: document.getElementById('controlError')
@@ -494,6 +498,21 @@ export function renderDashboardHtml(): string {
         await refresh();
       } finally {
         el.turnBtn.disabled = false;
+      }
+    });
+
+    el.speakBtn.addEventListener('click', async function () {
+      const text = String(el.utteranceInput.value || '').trim();
+      if (!text) {
+        el.controlError.textContent = 'Ingresa un texto para test de bocina.';
+        return;
+      }
+      el.speakBtn.disabled = true;
+      try {
+        await sendControl('/control/test-speak', { text: text });
+        await refresh();
+      } finally {
+        el.speakBtn.disabled = false;
       }
     });
 

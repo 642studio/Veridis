@@ -108,5 +108,34 @@ export class BridgeApiServer {
         });
       }
     });
+
+    this.app.post("/control/test-speak", async (request, reply) => {
+      const schema = z.object({
+        text: z.string().min(1),
+      });
+
+      const parsed = schema.safeParse(request.body ?? {});
+      if (!parsed.success) {
+        return reply.status(400).send({
+          ok: false,
+          error: "Invalid payload",
+          details: parsed.error.flatten(),
+        });
+      }
+
+      try {
+        await this.options.orchestrator.runSpeakerProbe(parsed.data.text);
+        return reply.status(202).send({
+          ok: true,
+          status: this.options.orchestrator.getStatus(),
+        });
+      } catch (error) {
+        return reply.status(409).send({
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+          status: this.options.orchestrator.getStatus(),
+        });
+      }
+    });
   }
 }

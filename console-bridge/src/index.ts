@@ -35,6 +35,7 @@ async function main(): Promise<void> {
     voice: config.OPENAI_REALTIME_VOICE,
     transcribeModel: config.OPENAI_REALTIME_TRANSCRIBE_MODEL,
     transcribeLanguage: config.OPENAI_REALTIME_TRANSCRIBE_LANGUAGE,
+    transcribePrompt: config.OPENAI_REALTIME_TRANSCRIBE_PROMPT,
     logger,
   });
 

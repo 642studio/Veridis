@@ -9,6 +9,9 @@ const schema = z.object({
   OPENAI_REALTIME_VOICE: z.string().default("alloy"),
   OPENAI_REALTIME_TRANSCRIBE_MODEL: z.string().default("gpt-4o-mini-transcribe"),
   OPENAI_REALTIME_TRANSCRIBE_LANGUAGE: z.string().default("es"),
+  OPENAI_REALTIME_TRANSCRIBE_PROMPT: z
+    .string()
+    .default("Transcribe en espanol latino de forma literal. No traduzcas."),
   OPENAI_REALTIME_URL: z.string().url().default("wss://api.openai.com/v1/realtime"),
   WAKE_PHRASE: z.string().min(1).default("oye veridis"),
   WAKE_COOLDOWN_MS: z.coerce.number().int().positive().default(1500),

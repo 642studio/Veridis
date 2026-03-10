@@ -8,6 +8,7 @@ export interface OpenClawAdapterOptions {
   agentId: string;
   sessionKey: string;
   timeoutMs: number;
+  localFallbackOnEmpty?: boolean;
   logger: Logger;
 }
 
@@ -186,7 +187,11 @@ export function extractOpenClawText(value: unknown): string | null {
 }
 
 export class OpenClawAdapter {
-  constructor(private readonly options: OpenClawAdapterOptions) {}
+  private readonly localFallbackOnEmpty: boolean;
+
+  constructor(private readonly options: OpenClawAdapterOptions) {
+    this.localFallbackOnEmpty = options.localFallbackOnEmpty ?? true;
+  }
 
   public async respond(prompt: string): Promise<OpenClawReply> {
     const startedAt = Date.now();
@@ -256,14 +261,46 @@ export class OpenClawAdapter {
       };
     }
 
-    const text =
-      extractOpenClawText(parsed) ?? "No pude extraer una respuesta legible desde OpenClaw.";
+    let text = extractOpenClawText(parsed);
+    if (!text && this.localFallbackOnEmpty) {
+      this.options.logger.warn("OpenClaw returned empty reply payload; retrying with --local");
+      const localParsed = await this.retryLocal(baseArgs);
+      if (localParsed) {
+        const localText = extractOpenClawText(localParsed);
+        if (localText) {
+          parsed = localParsed;
+          text = localText;
+        }
+      }
+    }
 
     return {
-      text,
+      text: text ?? "No pude extraer una respuesta legible desde OpenClaw.",
       raw: parsed,
       latencyMs: Date.now() - startedAt,
     };
+  }
+
+  private async retryLocal(baseArgs: string[]): Promise<unknown | null> {
+    const localBase = ["--local", ...baseArgs];
+    const attempts: string[][] = [
+      [...localBase, "--session-id", this.options.sessionKey],
+      localBase,
+    ];
+
+    for (const args of attempts) {
+      try {
+        const result = await this.runCommand(this.options.cliPath, args, this.options.timeoutMs);
+        return extractJsonPayload(result.stdout);
+      } catch (error) {
+        this.options.logger.warn("OpenClaw local fallback attempt failed", {
+          error: error instanceof Error ? error.message : String(error),
+          args: args.join(" "),
+        });
+      }
+    }
+
+    return null;
   }
 
   private runCommand(

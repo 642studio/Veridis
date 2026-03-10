@@ -15,6 +15,7 @@ export interface RealtimeClientOptions {
   voice: string;
   transcribeModel: string;
   transcribeLanguage?: string;
+  transcribePrompt?: string;
   reconnectBaseMs?: number;
   logger: Logger;
 }
@@ -118,8 +119,21 @@ export class RealtimeClient extends EventEmitter<RealtimeEvents> {
     this.send({
       type: "response.create",
       response: {
+        conversation: "none",
         modalities: ["audio", "text"],
-        instructions: `Responde exactamente con este texto y en espanol natural: ${text}`,
+        instructions:
+          "Lee en voz alta exactamente el texto proporcionado, en espanol natural y sin agregar informacion.",
+        input: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "input_text",
+                text,
+              },
+            ],
+          },
+        ],
         metadata: {
           bridge_request_id: requestId,
         },
@@ -200,6 +214,7 @@ export class RealtimeClient extends EventEmitter<RealtimeEvents> {
 
   private configureSession(): void {
     const language = this.options.transcribeLanguage?.trim();
+    const transcriptionPrompt = this.options.transcribePrompt?.trim();
     this.send({
       type: "session.update",
       session: {
@@ -210,6 +225,7 @@ export class RealtimeClient extends EventEmitter<RealtimeEvents> {
         input_audio_transcription: {
           model: this.options.transcribeModel,
           ...(language ? { language } : {}),
+          ...(transcriptionPrompt ? { prompt: transcriptionPrompt } : {}),
         },
         turn_detection: {
           type: "server_vad",

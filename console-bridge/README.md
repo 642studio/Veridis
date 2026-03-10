@@ -30,6 +30,7 @@ Estados del orquestador:
 - `POST /control/mute`
 - `POST /control/unmute`
 - `POST /control/test-turn` (payload: `{ "utterance": "..." }`)
+- `POST /control/test-speak` (payload: `{ "text": "..." }`)
 
 ## Eventos enviados al Core
 
@@ -49,6 +50,7 @@ Variables principales:
 - `OPENAI_REALTIME_MODEL`
 - `OPENAI_REALTIME_VOICE`
 - `OPENAI_REALTIME_TRANSCRIBE_LANGUAGE` (`es` recomendado)
+- `OPENAI_REALTIME_TRANSCRIBE_PROMPT`
 - `WAKE_PHRASE`
 - `KEEP_SNAPSHOTS` (`false` recomendado para 24/7)
 - `CAMERA_DEVICE`
