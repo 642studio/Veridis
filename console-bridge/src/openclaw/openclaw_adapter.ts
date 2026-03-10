@@ -22,14 +22,88 @@ function extractJsonPayload(raw: string): unknown {
   return JSON.parse(candidate);
 }
 
-function findFirstString(value: unknown): string | null {
-  if (typeof value === "string" && value.trim()) {
-    return value.trim();
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
+}
+
+function getByPath(value: unknown, path: string[]): unknown {
+  let current: unknown = value;
+  for (const key of path) {
+    const record = asRecord(current);
+    if (!record || !(key in record)) {
+      return undefined;
+    }
+    current = record[key];
+  }
+  return current;
+}
+
+function extractPayloadText(value: unknown): string | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  for (const item of value) {
+    const record = asRecord(item);
+    if (!record) {
+      continue;
+    }
+    const text = record.text;
+    if (typeof text === "string" && text.trim()) {
+      return text.trim();
+    }
+  }
+
+  return null;
+}
+
+const METADATA_STRING_KEYS = new Set([
+  "id",
+  "runId",
+  "sessionId",
+  "status",
+  "summary",
+  "provider",
+  "model",
+  "source",
+  "stopReason",
+]);
+
+const METADATA_OBJECT_KEYS = new Set([
+  "meta",
+  "usage",
+  "lastCallUsage",
+  "systemPromptReport",
+  "sandbox",
+  "skills",
+  "tools",
+  "bootstrapTruncation",
+]);
+
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function findFirstHumanString(value: unknown, parentKey?: string): string | null {
+  if (typeof value === "string") {
+    const text = value.trim();
+    if (!text) {
+      return null;
+    }
+    if (parentKey && METADATA_STRING_KEYS.has(parentKey)) {
+      return null;
+    }
+    if (UUID_REGEX.test(text)) {
+      return null;
+    }
+    return text;
   }
 
   if (Array.isArray(value)) {
     for (const item of value) {
-      const found = findFirstString(item);
+      const found = findFirstHumanString(item, parentKey);
       if (found) {
         return found;
       }
@@ -37,11 +111,11 @@ function findFirstString(value: unknown): string | null {
     return null;
   }
 
-  if (!value || typeof value !== "object") {
+  const objectValue = asRecord(value);
+  if (!objectValue) {
     return null;
   }
 
-  const objectValue = value as Record<string, unknown>;
   const preferredKeys = [
     "reply",
     "text",
@@ -49,11 +123,13 @@ function findFirstString(value: unknown): string | null {
     "content",
     "output_text",
     "assistant",
+    "answer",
+    "final",
   ];
 
   for (const key of preferredKeys) {
     if (key in objectValue) {
-      const found = findFirstString(objectValue[key]);
+      const found = findFirstHumanString(objectValue[key], key);
       if (found) {
         return found;
       }
@@ -61,13 +137,52 @@ function findFirstString(value: unknown): string | null {
   }
 
   for (const key of Object.keys(objectValue)) {
-    const found = findFirstString(objectValue[key]);
+    if (METADATA_OBJECT_KEYS.has(key)) {
+      continue;
+    }
+    const found = findFirstHumanString(objectValue[key], key);
     if (found) {
       return found;
     }
   }
 
   return null;
+}
+
+export function extractOpenClawText(value: unknown): string | null {
+  const payloadPaths = [
+    ["result", "payloads"],
+    ["payloads"],
+  ];
+
+  for (const path of payloadPaths) {
+    const text = extractPayloadText(getByPath(value, path));
+    if (text) {
+      return text;
+    }
+  }
+
+  const directTextPaths = [
+    ["result", "reply"],
+    ["result", "text"],
+    ["result", "message"],
+    ["result", "content"],
+    ["result", "output_text"],
+    ["reply"],
+    ["text"],
+    ["message"],
+    ["content"],
+    ["output_text"],
+  ];
+
+  for (const path of directTextPaths) {
+    const candidate = getByPath(value, path);
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+
+  return findFirstHumanString(value);
 }
 
 export class OpenClawAdapter {
@@ -142,7 +257,7 @@ export class OpenClawAdapter {
     }
 
     const text =
-      findFirstString(parsed) ?? "No pude extraer una respuesta legible desde OpenClaw.";
+      extractOpenClawText(parsed) ?? "No pude extraer una respuesta legible desde OpenClaw.";
 
     return {
       text,
