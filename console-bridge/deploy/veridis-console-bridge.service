@@ -1,0 +1,21 @@
+[Unit]
+Description=VERIDIS Console Bridge (Voice + Vision)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=veridis
+WorkingDirectory=/opt/veridis/console-bridge
+Environment=NODE_ENV=production
+EnvironmentFile=/opt/veridis/console-bridge/.env
+ExecStart=/usr/bin/env node /opt/veridis/console-bridge/dist/index.js
+Restart=always
+RestartSec=3
+KillSignal=SIGTERM
+TimeoutStopSec=15
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

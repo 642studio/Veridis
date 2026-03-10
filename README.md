@@ -14,6 +14,28 @@ Modular, event-driven platform — the digital nervous system of 642 Studio.
 - Minimal web assistant: Next.js + Tailwind
 - No vision, automation, avatar, or hardware
 
+## AutoClip as Clipping Module
+
+`autoclip/` se usa como modulo de clipeo desacoplado dentro de VERIDIS.
+
+Comandos rapidos:
+
+```bash
+# clonar/actualizar base desde 642studio/autoclip
+./scripts/autoclip-bootstrap.sh
+
+# iniciar modulo AutoClip
+./scripts/autoclip-module.sh start
+
+# validar salud del modulo
+./scripts/autoclip-module.sh health
+
+# reportar salud hacia VERIDIS Core como evento
+./scripts/autoclip-module.sh notify-health
+```
+
+Documentacion del modulo: `docs/autoclip-module.md`
+
 ## Quick Start
 
 ```bash
@@ -44,3 +66,15 @@ Open http://localhost:3000 for the minimal web assistant.
 
 - **Core:** Copy `core/.env.example` to `core/.env`, set `DATABASE_URL`
 - **Web:** Optional `NEXT_PUBLIC_CORE_URL` (default: `http://localhost:3001`)
+
+## Console Bridge (Voice + Vision MVP)
+
+`console-bridge/` agrega un servicio Node.js + TypeScript para interaccion por voz y vision:
+
+- Realtime audio (OpenAI Realtime API)
+- Wake-word por transcripcion
+- Snapshots de camara por turno
+- Respuesta final delegada a OpenClaw
+- Emision de eventos clave hacia `core` (`POST /events`)
+
+Ver guia: `console-bridge/README.md`
