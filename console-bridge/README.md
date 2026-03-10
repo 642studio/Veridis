@@ -25,6 +25,8 @@ Estados del orquestador:
 
 - `GET /health`
 - `GET /status`
+- `GET /dashboard` (UI experimental)
+- `GET /dashboard/data` (JSON para UI)
 - `POST /control/mute`
 - `POST /control/unmute`
 - `POST /control/test-turn` (payload: `{ "utterance": "..." }`)
@@ -117,6 +119,12 @@ npm run dev
 
 ```bash
 curl -s http://127.0.0.1:3400/status
+```
+
+UI experimental:
+
+```bash
+xdg-open http://127.0.0.1:3400/dashboard
 ```
 
 5. Prueba pipeline completo sin wake-word (manual):

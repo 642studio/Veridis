@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import type { BridgeOrchestrator } from "../orchestrator/orchestrator.js";
 import type { Logger } from "../util/logger.js";
+import { renderDashboardHtml } from "./ui_html.js";
 
 export interface BridgeApiServerOptions {
   port: number;
@@ -34,6 +35,10 @@ export class BridgeApiServer {
   }
 
   private registerRoutes(): void {
+    this.app.get("/", async (_request, reply) => {
+      return reply.redirect("/dashboard");
+    });
+
     this.app.get("/health", async () => {
       return {
         ok: true,
@@ -44,6 +49,14 @@ export class BridgeApiServer {
 
     this.app.get("/status", async () => {
       return this.options.orchestrator.getStatus();
+    });
+
+    this.app.get("/dashboard/data", async () => {
+      return this.options.orchestrator.getDashboardData();
+    });
+
+    this.app.get("/dashboard", async (_request, reply) => {
+      return reply.type("text/html; charset=utf-8").send(renderDashboardHtml());
     });
 
     this.app.post("/control/mute", async (_request, reply) => {

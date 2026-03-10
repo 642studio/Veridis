@@ -1,8 +1,18 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { unlink } from "node:fs/promises";
+import { readFile, unlink } from "node:fs/promises";
 
-import type { BridgeState, BridgeStatus, Snapshot, TurnContext } from "../types.js";
+import type {
+  BridgeActivityEvent,
+  BridgeDashboardData,
+  BridgeInteraction,
+  BridgeState,
+  BridgeStatus,
+  BridgeTranscriptStatus,
+  Snapshot,
+  TurnContext,
+  VisionSnapshotPreview,
+} from "../types.js";
 import type { CameraCapture } from "../camera/camera_capture.js";
 import type { CoreEventsClient } from "../core/core_events.js";
 import type { OpenClawAdapter } from "../openclaw/openclaw_adapter.js";
@@ -41,6 +51,8 @@ interface OrchestratorEvents {
 }
 
 export class BridgeOrchestrator extends EventEmitter<OrchestratorEvents> {
+  private static readonly ACTIVITY_LIMIT = 80;
+
   private state: BridgeState = "idle";
   private muted = false;
   private lastWakeAt = 0;
@@ -48,6 +60,13 @@ export class BridgeOrchestrator extends EventEmitter<OrchestratorEvents> {
   private lastTurn: BridgeStatus["lastTurn"] = null;
   private listeningTimeout: NodeJS.Timeout | null = null;
   private started = false;
+  private activity: BridgeActivityEvent[] = [];
+  private transcripts: BridgeTranscriptStatus = {
+    partial: null,
+    final: null,
+    updatedAt: null,
+  };
+  private lastInteraction: BridgeInteraction | null = null;
 
   constructor(
     private readonly deps: BridgeOrchestratorDeps,
@@ -84,6 +103,9 @@ export class BridgeOrchestrator extends EventEmitter<OrchestratorEvents> {
     this.deps.microphone.start();
 
     this.setState("armed");
+    this.pushActivity("system", "Console bridge session started", {
+      wakePhrase: this.options.wakePhrase,
+    });
     await this.deps.coreEvents.emit("console.session.started", "Console bridge session started", {
       wakePhrase: this.options.wakePhrase,
       cameraDevice: this.options.cameraDevice,
@@ -104,15 +126,18 @@ export class BridgeOrchestrator extends EventEmitter<OrchestratorEvents> {
     this.deps.speaker.stop();
     this.deps.realtimeClient.stop();
 
+    this.pushActivity("system", "Console bridge session stopped");
     this.setState("idle");
   }
 
   public mute(): void {
     this.muted = true;
+    this.pushActivity("system", "Microphone muted");
   }
 
   public unmute(): void {
     this.muted = false;
+    this.pushActivity("system", "Microphone unmuted");
   }
 
   public async runManualTurn(utterance: string): Promise<string> {
@@ -156,8 +181,23 @@ export class BridgeOrchestrator extends EventEmitter<OrchestratorEvents> {
     };
   }
 
+  public getDashboardData(): BridgeDashboardData {
+    return {
+      status: this.getStatus(),
+      interaction: this.lastInteraction,
+      transcripts: { ...this.transcripts },
+      activity: [...this.activity],
+    };
+  }
+
   private attachRealtimeListeners(): void {
     this.deps.realtimeClient.on("transcript.partial", (event) => {
+      this.transcripts = {
+        partial: event.text.trim() || null,
+        final: this.transcripts.final,
+        updatedAt: new Date().toISOString(),
+      };
+
       if (this.muted) {
         return;
       }
@@ -171,6 +211,17 @@ export class BridgeOrchestrator extends EventEmitter<OrchestratorEvents> {
     });
 
     this.deps.realtimeClient.on("transcript.final", (event) => {
+      const text = event.text.trim();
+      this.transcripts = {
+        partial: null,
+        final: text || null,
+        updatedAt: new Date().toISOString(),
+      };
+      if (text) {
+        this.pushActivity("transcript.final", "Final transcript received", {
+          text: text.slice(0, 220),
+        });
+      }
       void this.handleFinalTranscript(event.text);
     });
 
@@ -245,6 +296,9 @@ export class BridgeOrchestrator extends EventEmitter<OrchestratorEvents> {
 
     this.setState("listening");
     this.scheduleListeningTimeout();
+    this.pushActivity("wakeword", "Wake phrase detected", {
+      transcript: transcript.slice(0, 220),
+    });
 
     void this.deps.coreEvents.emit(
       "console.wakeword.detected",
@@ -289,6 +343,7 @@ export class BridgeOrchestrator extends EventEmitter<OrchestratorEvents> {
 
     const turnStart = Date.now();
     const snapshots: Snapshot[] = [];
+    let snapshotPreviews: VisionSnapshotPreview[] = [];
     this.setState("thinking");
 
     try {
@@ -307,6 +362,7 @@ export class BridgeOrchestrator extends EventEmitter<OrchestratorEvents> {
           error: error instanceof Error ? error.message : String(error),
         });
       }
+      snapshotPreviews = await this.buildSnapshotPreviews(snapshots);
 
       turn.visionSummary = await this.deps.visionSummarizer.summarize(snapshots);
       await this.deps.coreEvents.emit("console.vision.summary", "Vision summary produced", {
@@ -338,6 +394,23 @@ export class BridgeOrchestrator extends EventEmitter<OrchestratorEvents> {
         latencyMs,
         finishedAt: new Date(turn.finishedAt).toISOString(),
       };
+      this.lastInteraction = {
+        turnId: turn.id,
+        wakeTranscript: turn.wakeTranscript,
+        utterance: turn.utterance,
+        reply: openclawReply.text,
+        visionSummary: turn.visionSummary.summary,
+        visionModel: turn.visionSummary.model,
+        snapshots: snapshotPreviews,
+        latencyMs,
+        finishedAt: new Date(turn.finishedAt).toISOString(),
+      };
+      this.pushActivity("turn.completed", "Voice turn completed", {
+        turnId: turn.id,
+        utterance: turn.utterance.slice(0, 220),
+        replyPreview: openclawReply.text.slice(0, 220),
+        latencyMs,
+      });
 
       await this.deps.coreEvents.emit("console.turn.completed", "Voice turn completed", {
         turnId: turn.id,
@@ -360,6 +433,23 @@ export class BridgeOrchestrator extends EventEmitter<OrchestratorEvents> {
         finishedAt: new Date().toISOString(),
         error: errorMessage,
       };
+      this.lastInteraction = {
+        turnId: turn.id,
+        wakeTranscript: turn.wakeTranscript,
+        utterance: turn.utterance,
+        reply: "",
+        visionSummary: turn.visionSummary?.summary ?? "Vision summary unavailable.",
+        visionModel: turn.visionSummary?.model ?? "unknown",
+        snapshots: snapshotPreviews,
+        latencyMs: Date.now() - turnStart,
+        finishedAt: new Date().toISOString(),
+        error: errorMessage,
+      };
+      this.pushActivity("turn.failed", "Voice turn failed", {
+        turnId: turn.id,
+        utterance: turn.utterance.slice(0, 220),
+        error: errorMessage.slice(0, 220),
+      });
 
       this.options.logger.error("Turn failed", {
         error: errorMessage,
@@ -407,8 +497,51 @@ export class BridgeOrchestrator extends EventEmitter<OrchestratorEvents> {
       return;
     }
     this.state = nextState;
+    this.pushActivity("state", "Bridge state changed", { state: nextState });
     this.emit("state", nextState);
     this.options.logger.info("Bridge state changed", { state: nextState });
+  }
+
+  private pushActivity(
+    type: BridgeActivityEvent["type"],
+    message: string,
+    data?: Record<string, unknown>,
+  ): void {
+    const event: BridgeActivityEvent = {
+      id: randomUUID(),
+      at: new Date().toISOString(),
+      type,
+      message,
+      data,
+    };
+
+    this.activity = [event, ...this.activity].slice(0, BridgeOrchestrator.ACTIVITY_LIMIT);
+  }
+
+  private async buildSnapshotPreviews(snapshots: Snapshot[]): Promise<VisionSnapshotPreview[]> {
+    return Promise.all(
+      snapshots.map(async (snapshot) => {
+        try {
+          const image = await readFile(snapshot.path);
+          return {
+            source: snapshot.source,
+            capturedAt: snapshot.capturedAt,
+            path: snapshot.path,
+            imageDataUrl: `data:image/jpeg;base64,${image.toString("base64")}`,
+          };
+        } catch (error) {
+          this.options.logger.debug("Could not read snapshot for dashboard preview", {
+            path: snapshot.path,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          return {
+            source: snapshot.source,
+            capturedAt: snapshot.capturedAt,
+            path: snapshot.path,
+          };
+        }
+      }),
+    );
   }
 
   private async cleanupSnapshots(snapshots: Snapshot[]): Promise<void> {

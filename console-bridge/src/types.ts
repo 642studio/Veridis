@@ -56,6 +56,53 @@ export interface BridgeStatus {
   };
 }
 
+export interface VisionSnapshotPreview {
+  source: Snapshot["source"];
+  capturedAt: string;
+  path: string;
+  imageDataUrl?: string;
+}
+
+export interface BridgeInteraction {
+  turnId: string;
+  wakeTranscript: string;
+  utterance: string;
+  reply: string;
+  visionSummary: string;
+  visionModel: string;
+  snapshots: VisionSnapshotPreview[];
+  latencyMs: number;
+  finishedAt: string;
+  error?: string;
+}
+
+export interface BridgeTranscriptStatus {
+  partial: string | null;
+  final: string | null;
+  updatedAt: string | null;
+}
+
+export interface BridgeActivityEvent {
+  id: string;
+  at: string;
+  type:
+    | "system"
+    | "state"
+    | "wakeword"
+    | "transcript.final"
+    | "turn.completed"
+    | "turn.failed";
+  message: string;
+  data?: Record<string, unknown>;
+}
+
+export interface BridgeDashboardData {
+  status: BridgeStatus;
+  interaction: BridgeInteraction | null;
+  transcripts: BridgeTranscriptStatus;
+  activity: BridgeActivityEvent[];
+}
+
 export interface OpenClawReply {
   text: string;
   raw?: unknown;
