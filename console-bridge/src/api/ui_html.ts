@@ -393,11 +393,13 @@ export function renderDashboardHtml(): string {
     }
 
     async function postJson(url, payload) {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: payload ? JSON.stringify(payload) : undefined
-      });
+      const request = { method: 'POST' };
+      if (payload !== undefined) {
+        request.headers = { 'Content-Type': 'application/json' };
+        request.body = JSON.stringify(payload);
+      }
+
+      const response = await fetch(url, request);
       let json = null;
       try { json = await response.json(); } catch (_) { json = null; }
       if (!response.ok) {
