@@ -15,31 +15,17 @@ npm run build && npm start   # production
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` | Liveness check |
+| GET | `/state` | Raw system state (`status`, `lastEvent`, `recentEvents`) |
+| GET | `/events?limit=50` | Recent events (newest first) |
+| GET | `/alerts?limit=50` | Critical events only (newest first) |
 | POST | `/events` | Emit an event (updates system state) |
-| GET | `/state` | Raw system state |
-| POST | `/assistant/query` | Structured JSON summary for assistants (read-only) |
-| POST | `/events/simulate` | Emit a simulated event (convenience for testing) |
 
-## System State
+## POST /events payload
 
-- `system_status`: `"idle"` \| `"processing"` \| `"alert"`
-- `recent_events`: Last 10 events (max)
-- `alerts`: Events with `type: "alert"`
+`{ type: string, source?: string, level?: "info"|"warning"|"critical", message?: string, payload?: unknown, timestamp?: ISO8601 }`
 
-## POST /events
+Status mapping:
 
-Body: `{ type: string, payload?: object, source?: string }`
-
-Events with `type: "alert"` are added to the alerts array and set `system_status` to `"alert"`.
-
-## Simulate events
-
-```bash
-# From repo root (Core must be running)
-./scripts/simulate-event.sh vision.motion camera-1 medium
-
-# Or via curl
-curl -X POST http://localhost:3001/events/simulate \
-  -H "Content-Type: application/json" \
-  -d '{"type":"vision.motion","source":"camera-1","severity":"medium"}'
-```
+- `critical` -> `alert`
+- `warning` -> `processing`
+- `info` -> `idle`

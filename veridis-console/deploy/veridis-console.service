@@ -1,0 +1,20 @@
+[Unit]
+Description=VERIDIS Console TUI (Core events)
+After=network.target
+
+[Service]
+Type=simple
+User=coreprorex
+WorkingDirectory=/home/coreprorex/veridis/veridis-console
+Environment=PYTHONUNBUFFERED=1
+Environment=TERM=xterm-256color
+Environment=VERIDIS_CORE_URL=http://127.0.0.1:3001
+ExecStart=/home/coreprorex/veridis/veridis-console/.venv/bin/python -m app.main
+Restart=always
+RestartSec=2
+KillSignal=SIGINT
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

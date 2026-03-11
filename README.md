@@ -78,3 +78,13 @@ Open http://localhost:3000 for the minimal web assistant.
 - Emision de eventos clave hacia `core` (`POST /events`)
 
 Ver guia: `console-bridge/README.md`
+
+## Veridis Console (Avatar)
+
+`veridis-console/` es la interfaz TUI con avatar ASCII que reacciona a eventos del Core:
+
+- Consume `GET /events` (fallback a `GET /state`)
+- Mapea eventos a estados visuales del avatar
+- Permite override manual de estado con teclado
+
+Ver guia: `veridis-console/README.md`

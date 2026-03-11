@@ -38,6 +38,7 @@ Estados del orquestador:
 
 - `console.session.started`
 - `console.wakeword.detected`
+- `console.state.changed`
 - `console.vision.summary`
 - `console.turn.completed`
 - `console.turn.failed`

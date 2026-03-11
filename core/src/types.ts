@@ -13,5 +13,6 @@ export interface VeridisEvent {
 export interface SystemState {
   status: "idle" | "processing" | "alert";
   lastEvent: VeridisEvent | null;
+  recentEvents: VeridisEvent[];
   updatedAt: string; // ISO 8601
 }

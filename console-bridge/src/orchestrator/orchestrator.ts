@@ -590,6 +590,11 @@ export class BridgeOrchestrator extends EventEmitter<OrchestratorEvents> {
     }
     this.state = nextState;
     this.pushActivity("state", "Bridge state changed", { state: nextState });
+    void this.deps.coreEvents.emit("console.state.changed", "Bridge state changed", {
+      state: nextState,
+      triggerMode: this.options.triggerMode ?? "wakeword",
+      muted: this.muted,
+    });
     this.emit("state", nextState);
     this.options.logger.info("Bridge state changed", { state: nextState });
   }

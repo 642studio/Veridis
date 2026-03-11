@@ -1,0 +1,1 @@
+"""VERIDIS console app package."""
