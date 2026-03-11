@@ -75,11 +75,12 @@ export class RealtimeClient extends EventEmitter<RealtimeEvents> {
     this.ws?.close(1000, "bridge-stop");
     this.ws = null;
 
-    for (const [requestId, pending] of this.pendingSpeaks.entries()) {
-      clearTimeout(pending.timeout);
-      pending.reject(new Error(`Realtime client stopped before response for request ${requestId}`));
+    for (const requestId of Array.from(this.pendingSpeaks.keys())) {
+      this.rejectPendingSpeak(
+        requestId,
+        new Error(`Realtime client stopped before response for request ${requestId}`),
+      );
     }
-    this.pendingSpeaks.clear();
     this.responseToRequest.clear();
   }
 
@@ -104,12 +105,10 @@ export class RealtimeClient extends EventEmitter<RealtimeEvents> {
 
     const requestId = randomId("speak");
     const timeout = setTimeout(() => {
-      const pending = this.pendingSpeaks.get(requestId);
-      if (!pending) {
-        return;
-      }
-      this.pendingSpeaks.delete(requestId);
-      pending.reject(new Error(`Timed out waiting for realtime response (${requestId})`));
+      this.rejectPendingSpeak(
+        requestId,
+        new Error(`Timed out waiting for realtime response (${requestId})`),
+      );
     }, 45_000);
 
     const promise = new Promise<void>((resolve, reject) => {
@@ -120,11 +119,12 @@ export class RealtimeClient extends EventEmitter<RealtimeEvents> {
       type: "response.create",
       response: {
         conversation: "none",
-        modalities: ["audio", "text"],
+        output_modalities: ["audio", "text"],
         instructions:
           "Lee en voz alta exactamente el texto proporcionado, en espanol natural y sin agregar informacion.",
         input: [
           {
+            type: "message",
             role: "user",
             content: [
               {
@@ -334,7 +334,19 @@ export class RealtimeClient extends EventEmitter<RealtimeEvents> {
           event.error && typeof event.error === "object"
             ? JSON.stringify(event.error)
             : rawData;
-        this.emit("error", new Error(`Realtime error event: ${errorText}`));
+        const realtimeError = new Error(`Realtime error event: ${errorText}`);
+        const responseId =
+          event.error && typeof event.error === "object"
+            ? (event.error as Record<string, unknown>).response_id
+            : undefined;
+        let rejected = false;
+        if (typeof responseId === "string") {
+          rejected = this.rejectPendingSpeakByResponseId(responseId, realtimeError);
+        }
+        if (!rejected && this.pendingSpeaks.size > 0) {
+          this.rejectAllPendingSpeaks(realtimeError);
+        }
+        this.emit("error", realtimeError);
         break;
       }
 
@@ -348,5 +360,35 @@ export class RealtimeClient extends EventEmitter<RealtimeEvents> {
       throw new Error("Realtime websocket is not open");
     }
     this.ws.send(JSON.stringify(payload));
+  }
+
+  private rejectPendingSpeak(requestId: string, error: Error): boolean {
+    const pending = this.pendingSpeaks.get(requestId);
+    if (!pending) {
+      return false;
+    }
+
+    clearTimeout(pending.timeout);
+    this.pendingSpeaks.delete(requestId);
+    if (pending.responseId) {
+      this.responseToRequest.delete(pending.responseId);
+    }
+    pending.reject(error);
+    return true;
+  }
+
+  private rejectPendingSpeakByResponseId(responseId: string, error: Error): boolean {
+    const requestId = this.responseToRequest.get(responseId);
+    if (!requestId) {
+      return false;
+    }
+    this.responseToRequest.delete(responseId);
+    return this.rejectPendingSpeak(requestId, error);
+  }
+
+  private rejectAllPendingSpeaks(error: Error): void {
+    for (const requestId of Array.from(this.pendingSpeaks.keys())) {
+      this.rejectPendingSpeak(requestId, error);
+    }
   }
 }
