@@ -14,6 +14,7 @@ const schema = z.object({
     .default("Transcribe en espanol latino de forma literal. No traduzcas."),
   OPENAI_REALTIME_URL: z.string().url().default("wss://api.openai.com/v1/realtime"),
   WAKE_PHRASE: z.string().min(1).default("oye veridis"),
+  VOICE_TRIGGER_MODE: z.enum(["wakeword", "ptt"]).default("ptt"),
   WAKE_COOLDOWN_MS: z.coerce.number().int().positive().default(1500),
   TURN_COOLDOWN_MS: z.coerce.number().int().nonnegative().default(1200),
   KEEP_SNAPSHOTS: z.coerce.boolean().default(false),

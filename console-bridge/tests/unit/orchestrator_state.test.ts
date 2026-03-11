@@ -109,4 +109,49 @@ describe("BridgeOrchestrator state machine", () => {
 
     orchestrator.stop();
   });
+
+  it("supports push-to-talk mode without wakeword", async () => {
+    const { deps, realtime } = createMocks();
+
+    const logger = {
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    };
+
+    const orchestrator = new BridgeOrchestrator(deps, {
+      wakeCooldownMs: 1,
+      turnCooldownMs: 1,
+      keepSnapshots: false,
+      wakePhrase: "oye veridis",
+      triggerMode: "ptt",
+      micDevice: "default",
+      cameraDevice: "/dev/video0",
+      speakerSampleRate: 24000,
+      logger,
+    });
+
+    await orchestrator.start();
+
+    // In PTT mode, transcripts in armed state should not auto-run.
+    realtime.emit("transcript.final", {
+      text: "veridis dime el estado",
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(deps.openClaw.respond).not.toHaveBeenCalled();
+
+    orchestrator.startPushToTalk();
+    expect(orchestrator.getStatus().state).toBe("listening");
+
+    realtime.emit("transcript.final", {
+      text: "dime el estado del sistema",
+    });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+
+    expect(deps.openClaw.respond).toHaveBeenCalled();
+    expect(orchestrator.getStatus().state).toBe("armed");
+
+    orchestrator.stop();
+  });
 });

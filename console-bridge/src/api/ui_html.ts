@@ -278,6 +278,7 @@ export function renderDashboardHtml(): string {
       <section class="card span-4">
         <h2>Runtime</h2>
         <div class="row"><span class="label">State</span><span id="stateBadge" class="status info">-</span></div>
+        <div class="row"><span class="label">Trigger mode</span><span id="triggerModeBadge" class="status warn">-</span></div>
         <div class="row"><span class="label">Realtime WS</span><span id="wsBadge" class="status warn">-</span></div>
         <div class="row"><span class="label">Microphone</span><span id="micBadge" class="status warn">-</span></div>
         <div class="row"><span class="label">Muted</span><span id="mutedBadge" class="status warn">-</span></div>
@@ -295,6 +296,7 @@ export function renderDashboardHtml(): string {
           <div class="btn-row">
             <button id="turnBtn" type="button">Run Test Turn</button>
             <button id="speakBtn" type="button">Test Speaker</button>
+            <button id="pttBtn" type="button">Press to Talk</button>
           </div>
           <div id="controlMessage" class="sub"></div>
           <div id="controlError" class="err"></div>
@@ -339,6 +341,7 @@ export function renderDashboardHtml(): string {
     const el = {
       lastUpdate: document.getElementById('lastUpdate'),
       stateBadge: document.getElementById('stateBadge'),
+      triggerModeBadge: document.getElementById('triggerModeBadge'),
       wsBadge: document.getElementById('wsBadge'),
       micBadge: document.getElementById('micBadge'),
       mutedBadge: document.getElementById('mutedBadge'),
@@ -361,6 +364,7 @@ export function renderDashboardHtml(): string {
       refreshBtn: document.getElementById('refreshBtn'),
       turnBtn: document.getElementById('turnBtn'),
       speakBtn: document.getElementById('speakBtn'),
+      pttBtn: document.getElementById('pttBtn'),
       utteranceInput: document.getElementById('utteranceInput'),
       controlMessage: document.getElementById('controlMessage'),
       controlError: document.getElementById('controlError')
@@ -418,6 +422,7 @@ export function renderDashboardHtml(): string {
       el.lastUpdate.textContent = new Date().toLocaleTimeString();
 
       setBadge(el.stateBadge, status.state || '-', 'info');
+      setBadge(el.triggerModeBadge, status.triggerMode || 'wakeword', status.triggerMode === 'ptt' ? 'ok' : 'warn');
       setBadge(el.wsBadge, status.runtime && status.runtime.realtimeConnected ? 'Connected' : 'Disconnected', status.runtime && status.runtime.realtimeConnected ? 'ok' : 'bad');
       setBadge(el.micBadge, status.runtime && status.runtime.microphoneRunning ? 'Running' : 'Stopped', status.runtime && status.runtime.microphoneRunning ? 'ok' : 'bad');
       setBadge(el.mutedBadge, status.muted ? 'Muted' : 'Live', status.muted ? 'warn' : 'ok');
@@ -433,6 +438,10 @@ export function renderDashboardHtml(): string {
         setBadge(el.wakeEvalBadge, '-', 'warn');
         el.wakeEvalText.textContent = '-';
       }
+
+      const isListening = status.state === 'listening';
+      el.pttBtn.textContent = isListening ? 'Cancel PTT' : 'Press to Talk';
+      el.pttBtn.disabled = status.state === 'thinking' || status.state === 'speaking';
 
       el.turnIdText.textContent = interaction && interaction.turnId ? interaction.turnId : '-';
       el.wakeText.textContent = interaction && interaction.wakeTranscript ? interaction.wakeTranscript : '-';
@@ -526,6 +535,18 @@ export function renderDashboardHtml(): string {
         await refresh();
       } finally {
         el.speakBtn.disabled = false;
+      }
+    });
+
+    el.pttBtn.addEventListener('click', async function () {
+      const isListening = el.pttBtn.textContent === 'Cancel PTT';
+      const endpoint = isListening ? '/control/ptt/cancel' : '/control/ptt/start';
+      el.pttBtn.disabled = true;
+      try {
+        await sendControl(endpoint);
+        await refresh();
+      } finally {
+        el.pttBtn.disabled = false;
       }
     });
 

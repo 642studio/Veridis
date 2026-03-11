@@ -36,6 +36,7 @@ export interface BridgeStatus {
   state: BridgeState;
   muted: boolean;
   wakePhrase: string;
+  triggerMode: "wakeword" | "ptt";
   lastWakeAt: string | null;
   runtime: {
     realtimeConnected: boolean;

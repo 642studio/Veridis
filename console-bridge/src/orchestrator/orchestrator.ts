@@ -28,6 +28,7 @@ export interface BridgeOrchestratorOptions {
   turnCooldownMs: number;
   keepSnapshots: boolean;
   wakePhrase: string;
+  triggerMode?: "wakeword" | "ptt";
   micDevice: string;
   cameraDevice: string;
   speakerDevice?: string;
@@ -166,6 +167,40 @@ export class BridgeOrchestrator extends EventEmitter<OrchestratorEvents> {
     return turnId;
   }
 
+  public startPushToTalk(): string {
+    if (this.state === "thinking" || this.state === "speaking") {
+      throw new Error("Bridge is busy processing another turn");
+    }
+    if (this.state === "listening" && this.activeTurn) {
+      return this.activeTurn.id;
+    }
+
+    const now = Date.now();
+    this.lastWakeAt = now;
+    this.activeTurn = {
+      id: randomUUID(),
+      wakewordDetectedAt: now,
+      wakeTranscript: "[ptt.button]",
+      utterance: "",
+    };
+    this.setState("listening");
+    this.scheduleListeningTimeout();
+    this.pushActivity("system", "PTT listening started", {
+      turnId: this.activeTurn.id,
+    });
+    return this.activeTurn.id;
+  }
+
+  public cancelPushToTalk(): void {
+    if (this.state !== "listening") {
+      return;
+    }
+    this.clearListeningTimeout();
+    this.activeTurn = null;
+    this.setState("armed");
+    this.pushActivity("system", "PTT listening canceled");
+  }
+
   public async runSpeakerProbe(text: string): Promise<void> {
     const normalizedText = text.trim();
     if (!normalizedText) {
@@ -200,6 +235,7 @@ export class BridgeOrchestrator extends EventEmitter<OrchestratorEvents> {
       state: this.state,
       muted: this.muted,
       wakePhrase: this.options.wakePhrase,
+      triggerMode: this.options.triggerMode ?? "wakeword",
       lastWakeAt: this.lastWakeAt > 0 ? new Date(this.lastWakeAt).toISOString() : null,
       runtime: {
         realtimeConnected: this.deps.realtimeClient.isConnected(),
@@ -234,6 +270,9 @@ export class BridgeOrchestrator extends EventEmitter<OrchestratorEvents> {
       };
 
       if (this.muted) {
+        return;
+      }
+      if ((this.options.triggerMode ?? "wakeword") !== "wakeword") {
         return;
       }
       if (this.state !== "armed" && this.state !== "listening") {
@@ -288,7 +327,8 @@ export class BridgeOrchestrator extends EventEmitter<OrchestratorEvents> {
       return;
     }
 
-    const shouldEvaluateWakeword = this.state === "armed" || this.state === "listening";
+    const isWakewordMode = (this.options.triggerMode ?? "wakeword") === "wakeword";
+    const shouldEvaluateWakeword = isWakewordMode && (this.state === "armed" || this.state === "listening");
     const wakeMatched = shouldEvaluateWakeword && this.deps.wakewordDetector.matches(text);
     const extracted = wakeMatched ? this.deps.wakewordDetector.extractUtterance(text) : "";
 
@@ -305,6 +345,9 @@ export class BridgeOrchestrator extends EventEmitter<OrchestratorEvents> {
     }
 
     if (this.state === "armed") {
+      if (!isWakewordMode) {
+        return;
+      }
       if (!wakeMatched) {
         return;
       }

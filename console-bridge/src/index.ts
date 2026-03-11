@@ -80,6 +80,7 @@ async function main(): Promise<void> {
       turnCooldownMs: config.TURN_COOLDOWN_MS,
       keepSnapshots: config.KEEP_SNAPSHOTS,
       wakePhrase: config.WAKE_PHRASE,
+      triggerMode: config.VOICE_TRIGGER_MODE,
       micDevice: config.MIC_DEVICE,
       cameraDevice: config.CAMERA_DEVICE,
       speakerDevice: config.SPEAKER_DEVICE,

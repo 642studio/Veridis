@@ -137,5 +137,30 @@ export class BridgeApiServer {
         });
       }
     });
+
+    this.app.post("/control/ptt/start", async (_request, reply) => {
+      try {
+        const turnId = this.options.orchestrator.startPushToTalk();
+        return reply.status(202).send({
+          ok: true,
+          turnId,
+          status: this.options.orchestrator.getStatus(),
+        });
+      } catch (error) {
+        return reply.status(409).send({
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+          status: this.options.orchestrator.getStatus(),
+        });
+      }
+    });
+
+    this.app.post("/control/ptt/cancel", async (_request, reply) => {
+      this.options.orchestrator.cancelPushToTalk();
+      return reply.status(200).send({
+        ok: true,
+        status: this.options.orchestrator.getStatus(),
+      });
+    });
   }
 }

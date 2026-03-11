@@ -31,6 +31,8 @@ Estados del orquestador:
 - `POST /control/unmute`
 - `POST /control/test-turn` (payload: `{ "utterance": "..." }`)
 - `POST /control/test-speak` (payload: `{ "text": "..." }`)
+- `POST /control/ptt/start` (inicia un turno por voz sin wake-word)
+- `POST /control/ptt/cancel` (cancela escucha PTT)
 
 ## Eventos enviados al Core
 
@@ -52,6 +54,7 @@ Variables principales:
 - `OPENAI_REALTIME_TRANSCRIBE_LANGUAGE` (`es` recomendado)
 - `OPENAI_REALTIME_TRANSCRIBE_PROMPT`
 - `WAKE_PHRASE`
+- `VOICE_TRIGGER_MODE` (`ptt` recomendado, `wakeword` opcional)
 - `KEEP_SNAPSHOTS` (`false` recomendado para 24/7)
 - `CAMERA_DEVICE`
 - `MIC_DEVICE`
