@@ -91,6 +91,7 @@ export interface BridgeActivityEvent {
     | "system"
     | "state"
     | "wakeword"
+    | "wakeword.eval"
     | "transcript.final"
     | "turn.completed"
     | "turn.failed";

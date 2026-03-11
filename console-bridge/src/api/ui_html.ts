@@ -307,6 +307,8 @@ export function renderDashboardHtml(): string {
         <div id="partialTranscript" class="mono">-</div>
         <div class="row" style="margin-top:8px;"><span class="label">Final transcript</span></div>
         <div id="finalTranscript" class="mono">-</div>
+        <div class="row" style="margin-top:8px;"><span class="label">Wakeword eval</span><span id="wakeEvalBadge" class="status warn">-</span></div>
+        <div id="wakeEvalText" class="mono">-</div>
       </section>
 
       <section class="card span-6">
@@ -342,6 +344,8 @@ export function renderDashboardHtml(): string {
       mutedBadge: document.getElementById('mutedBadge'),
       partialTranscript: document.getElementById('partialTranscript'),
       finalTranscript: document.getElementById('finalTranscript'),
+      wakeEvalBadge: document.getElementById('wakeEvalBadge'),
+      wakeEvalText: document.getElementById('wakeEvalText'),
       turnIdText: document.getElementById('turnIdText'),
       wakeText: document.getElementById('wakeText'),
       userText: document.getElementById('userText'),
@@ -420,6 +424,15 @@ export function renderDashboardHtml(): string {
 
       el.partialTranscript.textContent = transcripts.partial || '-';
       el.finalTranscript.textContent = transcripts.final || '-';
+      const wakeEval = activity.slice().reverse().find(function (entry) { return entry && entry.type === 'wakeword.eval'; }) || null;
+      if (wakeEval) {
+        const matched = wakeEval.message === 'Wakeword matched';
+        setBadge(el.wakeEvalBadge, matched ? 'Matched' : 'No match', matched ? 'ok' : 'warn');
+        el.wakeEvalText.textContent = wakeEval.data ? JSON.stringify(wakeEval.data) : '-';
+      } else {
+        setBadge(el.wakeEvalBadge, '-', 'warn');
+        el.wakeEvalText.textContent = '-';
+      }
 
       el.turnIdText.textContent = interaction && interaction.turnId ? interaction.turnId : '-';
       el.wakeText.textContent = interaction && interaction.wakeTranscript ? interaction.wakeTranscript : '-';

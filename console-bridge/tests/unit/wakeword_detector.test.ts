@@ -11,6 +11,7 @@ describe("WakewordDetector", () => {
   it("detects wake phrase with common ASR variations", () => {
     const detector = new WakewordDetector("oye veridis");
     expect(detector.matches("Oye, Belis, dime el estado")).toBe(true);
+    expect(detector.matches("Oye, Melis, dime el estado")).toBe(true);
     expect(detector.matches("oye beridis responde")).toBe(true);
   });
 

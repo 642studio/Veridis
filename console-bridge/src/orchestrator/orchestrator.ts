@@ -288,12 +288,28 @@ export class BridgeOrchestrator extends EventEmitter<OrchestratorEvents> {
       return;
     }
 
+    const shouldEvaluateWakeword = this.state === "armed" || this.state === "listening";
+    const wakeMatched = shouldEvaluateWakeword && this.deps.wakewordDetector.matches(text);
+    const extracted = wakeMatched ? this.deps.wakewordDetector.extractUtterance(text) : "";
+
+    if (shouldEvaluateWakeword) {
+      this.pushActivity(
+        "wakeword.eval",
+        wakeMatched ? "Wakeword matched" : "Wakeword not matched",
+        {
+          text: text.slice(0, 220),
+          extracted: extracted.slice(0, 220),
+          state: this.state,
+        },
+      );
+    }
+
     if (this.state === "armed") {
-      if (!this.deps.wakewordDetector.matches(text)) {
+      if (!wakeMatched) {
         return;
       }
       this.onWakewordDetected(text);
-      const utterance = this.deps.wakewordDetector.extractUtterance(text);
+      const utterance = extracted;
       if (utterance) {
         await this.runTurn(utterance, text);
       }
@@ -302,9 +318,7 @@ export class BridgeOrchestrator extends EventEmitter<OrchestratorEvents> {
 
     if (this.state === "listening") {
       this.clearListeningTimeout();
-      const utterance = this.deps.wakewordDetector.matches(text)
-        ? this.deps.wakewordDetector.extractUtterance(text)
-        : text;
+      const utterance = wakeMatched ? extracted : text;
 
       if (!utterance.trim()) {
         this.setState("armed");

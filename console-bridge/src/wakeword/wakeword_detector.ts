@@ -112,13 +112,33 @@ export class WakewordDetector {
       return true;
     }
 
-    const maxLength = Math.max(expected.length, actual.length);
-    const maxDistance = WakewordDetector.allowedDistance(maxLength);
-    if (maxDistance === 0) {
-      return false;
+    const directMaxLength = Math.max(expected.length, actual.length);
+    const directMaxDistance = WakewordDetector.allowedDistance(directMaxLength);
+    const canonicalMaxLength = Math.max(expectedCanonical.length, actualCanonical.length);
+    const canonicalMaxDistance = WakewordDetector.allowedDistance(canonicalMaxLength);
+
+    const directDistance = WakewordDetector.levenshteinDistance(expected, actual);
+    if (directDistance <= directMaxDistance) {
+      return true;
     }
 
-    return WakewordDetector.levenshteinDistance(expected, actual) <= maxDistance;
+    const canonicalDistance = WakewordDetector.levenshteinDistance(
+      expectedCanonical,
+      actualCanonical,
+    );
+    if (canonicalDistance <= canonicalMaxDistance) {
+      return true;
+    }
+
+    // Explicit fallback for most frequent wakeword ASR deformations seen in production.
+    if (
+      (expectedCanonical === "belis" || expectedCanonical === "beris") &&
+      (actualCanonical === "melis" || actualCanonical === "meris")
+    ) {
+      return true;
+    }
+
+    return false;
   }
 
   private static allowedDistance(maxLength: number): number {
