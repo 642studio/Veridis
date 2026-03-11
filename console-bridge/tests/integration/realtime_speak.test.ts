@@ -72,7 +72,7 @@ describe("RealtimeClient speakText", () => {
     await client.speakText("hola veridis");
 
     expect(responseCreatePayload).toBeTruthy();
-    expect(responseCreatePayload.response.output_modalities).toEqual(["audio", "text"]);
+    expect(responseCreatePayload.response.modalities).toEqual(["audio", "text"]);
     expect(responseCreatePayload.response.input[0].type).toBe("message");
     expect(responseCreatePayload.response.input[0].content[0]).toMatchObject({
       type: "input_text",

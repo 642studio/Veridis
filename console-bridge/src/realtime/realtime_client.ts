@@ -119,7 +119,7 @@ export class RealtimeClient extends EventEmitter<RealtimeEvents> {
       type: "response.create",
       response: {
         conversation: "none",
-        output_modalities: ["audio", "text"],
+        modalities: ["audio", "text"],
         instructions:
           "Lee en voz alta exactamente el texto proporcionado, en espanol natural y sin agregar informacion.",
         input: [
