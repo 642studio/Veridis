@@ -13,18 +13,18 @@ export class WakewordDetector {
   public matches(text: string): boolean {
     const normalizedText = WakewordDetector.normalize(text);
     const textTokens = WakewordDetector.tokenize(normalizedText);
-    return this.findPhraseStart(textTokens) !== -1;
+    return this.findPhraseMatch(textTokens) !== null;
   }
 
   public extractUtterance(text: string): string {
     const normalizedText = WakewordDetector.normalize(text);
     const textTokens = WakewordDetector.tokenize(normalizedText);
-    const phraseStart = this.findPhraseStart(textTokens);
-    if (phraseStart === -1) {
+    const phraseMatch = this.findPhraseMatch(textTokens);
+    if (!phraseMatch) {
       return text.trim();
     }
 
-    return textTokens.slice(phraseStart + this.phraseTokens.length).join(" ").trim();
+    return textTokens.slice(phraseMatch.endExclusive).join(" ").trim();
   }
 
   public get phraseValue(): string {
@@ -41,21 +41,56 @@ export class WakewordDetector {
       .trim();
   }
 
-  private findPhraseStart(textTokens: string[]): number {
+  private findPhraseMatch(
+    textTokens: string[],
+  ): { start: number; endExclusive: number } | null {
     if (this.phraseTokens.length === 0 || textTokens.length < this.phraseTokens.length) {
-      return -1;
+      return null;
     }
 
     for (let i = 0; i <= textTokens.length - this.phraseTokens.length; i += 1) {
-      let allMatch = true;
-      for (let j = 0; j < this.phraseTokens.length; j += 1) {
-        if (!WakewordDetector.tokenMatches(this.phraseTokens[j], textTokens[i + j])) {
-          allMatch = false;
-          break;
-        }
+      const endExclusive = this.matchFrom(i, 0, textTokens);
+      if (endExclusive !== -1) {
+        return {
+          start: i,
+          endExclusive,
+        };
       }
-      if (allMatch) {
-        return i;
+    }
+
+    return null;
+  }
+
+  private matchFrom(
+    textIndex: number,
+    phraseIndex: number,
+    textTokens: string[],
+  ): number {
+    if (phraseIndex >= this.phraseTokens.length) {
+      return textIndex;
+    }
+
+    if (textIndex >= textTokens.length) {
+      return -1;
+    }
+
+    const expectedToken = this.phraseTokens[phraseIndex];
+    const oneToken = textTokens[textIndex];
+    if (WakewordDetector.tokenMatches(expectedToken, oneToken)) {
+      const oneTokenResult = this.matchFrom(textIndex + 1, phraseIndex + 1, textTokens);
+      if (oneTokenResult !== -1) {
+        return oneTokenResult;
+      }
+    }
+
+    // Some ASR outputs split one keyword in two tokens: "vari vis" vs "veridis".
+    if (textIndex + 1 < textTokens.length) {
+      const twoTokenMerged = `${textTokens[textIndex]}${textTokens[textIndex + 1]}`;
+      if (WakewordDetector.tokenMatches(expectedToken, twoTokenMerged)) {
+        const twoTokenResult = this.matchFrom(textIndex + 2, phraseIndex + 1, textTokens);
+        if (twoTokenResult !== -1) {
+          return twoTokenResult;
+        }
       }
     }
 

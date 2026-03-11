@@ -33,6 +33,12 @@ describe("WakewordDetector", () => {
     );
   });
 
+  it("detects wake phrase when ASR splits keyword in two tokens", () => {
+    const detector = new WakewordDetector("oye veridis");
+    expect(detector.matches("Oye, vari vis, que ves")).toBe(true);
+    expect(detector.extractUtterance("Oye, vari vis, que ves")).toBe("que ves");
+  });
+
   it("returns trimmed text when wake phrase is absent", () => {
     const detector = new WakewordDetector("oye veridis");
     expect(detector.extractUtterance("estado actual del sistema")).toBe(
